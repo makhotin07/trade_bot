@@ -35,7 +35,15 @@ async def process_message(message_text):
     
     # Парсим сообщение по регулярке (ищем формат: ТОКЕН\n...Result DD.MM.YYYY HH:MM UTC или без UTC)
     logger.debug(f"[Telethon] Обработка сообщения (первые 200 символов): {message_text[:200]}")
+    
+    # Сначала пробуем re.match (с начала строки)
     match = re.match(POST_REGEX, message_text, re.DOTALL | re.MULTILINE)
+    
+    # Если не совпало, пробуем re.search (в любом месте сообщения)
+    if not match:
+        match = re.search(POST_REGEX, message_text, re.DOTALL | re.MULTILINE)
+        if match:
+            logger.info(f"[Telethon] Паттерн найден через re.search (не с начала строки)")
     
     if not match:
         # Логируем только первые 5 несовпавших сообщений, чтобы не засорять логи
