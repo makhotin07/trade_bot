@@ -62,14 +62,24 @@ def get_balance(user_id, bot):
             bot.send_message(user_id, "❌ Информация о монетах не найдена")
             return
         
+        # Вспомогательная функция для безопасного преобразования в float
+        def safe_float(value, default=0.0):
+            """Безопасно преобразует значение в float"""
+            if value is None or value == "":
+                return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
         # Формируем сообщение с балансом
         balance_text = "💰 Текущий баланс:\n\n"
         
         for coin in coin_list:
             coin_name = coin.get("coin", "N/A")
-            wallet_balance = float(coin.get("walletBalance", 0))
-            available_balance = float(coin.get("availableToWithdraw", 0))
-            locked = float(coin.get("locked", 0))
+            wallet_balance = safe_float(coin.get("walletBalance"))
+            available_balance = safe_float(coin.get("availableToWithdraw"))
+            locked = safe_float(coin.get("locked"))
             
             if wallet_balance > 0 or locked > 0:
                 balance_text += (
@@ -83,9 +93,9 @@ def get_balance(user_id, bot):
         if "USDT" not in balance_text:
             usdt_coin = next((c for c in coin_list if c.get("coin") == "USDT"), None)
             if usdt_coin:
-                wallet_balance = float(usdt_coin.get("walletBalance", 0))
-                available_balance = float(usdt_coin.get("availableToWithdraw", 0))
-                locked = float(usdt_coin.get("locked", 0))
+                wallet_balance = safe_float(usdt_coin.get("walletBalance"))
+                available_balance = safe_float(usdt_coin.get("availableToWithdraw"))
+                locked = safe_float(usdt_coin.get("locked"))
                 
                 balance_text = (
                     f"💰 Баланс USDT:\n\n"
@@ -188,7 +198,9 @@ def long_token(token, user_id, bot):
             bot.send_message(user_id, "❌ Ошибка получения баланса")
             return
         
-        available_balance = float(balance["result"]["list"][0]["coin"][0]["walletBalance"])
+        # Безопасное преобразование баланса
+        wallet_balance_str = balance["result"]["list"][0]["coin"][0].get("walletBalance", "0")
+        available_balance = float(wallet_balance_str) if wallet_balance_str and wallet_balance_str != "" else 0.0
         
         if available_balance < margin:
             bot.send_message(user_id, f"❌ Недостаточно средств. Доступно: {available_balance} USDT, требуется: {margin} USDT")
