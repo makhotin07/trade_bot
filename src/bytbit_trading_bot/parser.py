@@ -34,10 +34,17 @@ async def process_message(message_text):
         return False
     
     # Парсим сообщение по регулярке (ищем формат: ТОКЕН\n...Result DD.MM.YYYY HH:MM UTC или без UTC)
+    logger.debug(f"[Telethon] Обработка сообщения (первые 200 символов): {message_text[:200]}")
     match = re.match(POST_REGEX, message_text, re.DOTALL | re.MULTILINE)
     
     if not match:
+        # Логируем только первые 5 несовпавших сообщений, чтобы не засорять логи
         logger.debug(f"[Telethon] Сообщение не соответствует паттерну: {message_text[:100]}")
+        # Проверяем, есть ли хотя бы слово "Result" в сообщении
+        if "Result" in message_text or "result" in message_text.lower():
+            logger.warning(f"[Telethon] ⚠️  В сообщении есть 'Result', но оно не совпало с паттерном!")
+            logger.warning(f"[Telethon] ⚠️  Паттерн: {POST_REGEX}")
+            logger.warning(f"[Telethon] ⚠️  Сообщение: {message_text[:300]}")
         return False
     
     # Извлекаем токен и дату Result
@@ -100,29 +107,51 @@ async def check_recent_messages():
     """
     try:
         logger.info(f"[Telethon] 📖 Читаю последние {MESSAGES_HISTORY_LIMIT} сообщений из {CHANNEL}...")
+        logger.info(f"[Telethon] Используется регулярное выражение: {POST_REGEX}")
+        logger.info(f"[Telethon] Файл для сохранения токенов: {TOKENS_FILE}")
         
         messages_processed = 0
         tokens_found = 0
+        messages_with_text = 0
+        messages_matched = 0
         
         # Читаем последние сообщения из канала
         async for message in client.iter_messages(CHANNEL, limit=MESSAGES_HISTORY_LIMIT):
+            messages_processed += 1
+            
             if message.text:
+                messages_with_text += 1
+                # Логируем первые несколько сообщений для отладки
+                if messages_with_text <= 3:
+                    logger.info(f"[Telethon] Пример сообщения #{messages_with_text}: {message.text[:200]}...")
+                
                 # Обрабатываем каждое сообщение (находит анонсы и планирует задачи)
-                if await process_message(message.text):
+                result = await process_message(message.text)
+                if result:
                     tokens_found += 1
-                messages_processed += 1
+                    messages_matched += 1
+                    logger.info(f"[Telethon] ✅ Токен успешно обработан (всего найдено: {tokens_found})")
         
-        logger.info(f"[Telethon] ✅ Проверено {messages_processed} сообщений, найдено {tokens_found} новых токенов с будущими датами")
+        logger.info(f"[Telethon] ✅ Статистика:")
+        logger.info(f"[Telethon]    - Всего сообщений проверено: {messages_processed}")
+        logger.info(f"[Telethon]    - Сообщений с текстом: {messages_with_text}")
+        logger.info(f"[Telethon]    - Сообщений с совпадением паттерна: {messages_matched}")
+        logger.info(f"[Telethon]    - Найдено новых токенов с будущими датами: {tokens_found}")
+        
+        # Проверяем, что файл токенов существует и содержит данные
+        tokens = load_json(TOKENS_FILE)
+        logger.info(f"[Telethon] ✅ Всего токенов в файле: {len(tokens)}")
         
     except Exception as e:
         error_msg = str(e)
+        logger.error(f"[Telethon] ❌ Ошибка проверки последних сообщений: {e}", exc_info=True)
         if "bot" in error_msg.lower() or "BotMethodInvalidError" in error_msg:
             logger.error(f"[Telethon] ⚠️  Не удалось прочитать историю сообщений: авторизация как бот")
             logger.error(f"[Telethon] ⚠️  Решение: удалите файл my_session.session и перезапустите бота")
             logger.error(f"[Telethon] ⚠️  При запросе 'Please enter your phone (or bot token):' введите НОМЕР ТЕЛЕФОНА, а не токен бота!")
             logger.info(f"[Telethon] ⚠️  Бот продолжит работать, но будет обрабатывать только новые сообщения")
         else:
-            logger.error(f"[Telethon] Ошибка проверки последних сообщений: {e}", exc_info=True)
+            logger.error(f"[Telethon] Полная трассировка ошибки:", exc_info=True)
 
 
 async def start_telethon():
@@ -235,6 +264,14 @@ async def start_telethon():
             return
         
         logger.info(f"[Telethon] Успешно подключен к Telegram как пользователь: {me.first_name} (@{me.username})")
+        
+        # Проверяем доступ к каналу
+        try:
+            entity = await client.get_entity(CHANNEL)
+            logger.info(f"[Telethon] ✅ Канал доступен: {entity.title} (ID: {entity.id})")
+        except Exception as e:
+            logger.error(f"[Telethon] ❌ Ошибка доступа к каналу {CHANNEL}: {e}")
+            return
         
         # Шаг 2: Читаем последние 50 сообщений из канала
         # Шаг 3: Находим новые анонсы
