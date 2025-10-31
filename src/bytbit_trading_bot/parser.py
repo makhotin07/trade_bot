@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime, timezone
 from telethon import TelegramClient, events
 from .utils import parse_result_date, load_json, save_json, TOKENS_FILE
-from .config import API_ID, API_HASH, SESSION_NAME, CHANNEL, POST_REGEX, MESSAGES_HISTORY_LIMIT
+from .config import API_ID, API_HASH, SESSION_NAME, CHANNEL, POST_REGEX, MESSAGES_HISTORY_LIMIT, TOKEN
 from .scheduler import schedule_token
 
 logger = logging.getLogger(__name__)
@@ -238,55 +238,79 @@ async def start_telethon():
             logger.warning(f"[Telethon] ⚠️  Сессия существует, но не авторизована!")
             logger.warning(f"[Telethon] ⚠️  Файл сессии: {session_file}")
             logger.warning(f"[Telethon] ⚠️  Файл существует: {os.path.exists(session_file)}")
-            logger.warning(f"[Telethon] ⚠️  Возможно, сессия была удалена или повреждена при обновлении.")
-            logger.warning(f"[Telethon] ⚠️  Необходимо пересоздать сессию.")
-            logger.warning(f"[Telethon] ⚠️  Выполните на сервере:")
-            logger.warning(f"[Telethon] ⚠️  1. cd /root/trade_bot")
-            logger.warning(f"[Telethon] ⚠️  2. source .venv/bin/activate")
-            logger.warning(f"[Telethon] ⚠️  3. python3 scripts/init_telethon_session.py")
-            logger.warning(f"[Telethon] ⚠️  4. Введите номер телефона и код подтверждения из Telegram")
-            logger.warning(f"[Telethon] ⚠️  5. После успешной авторизации перезапустите бота:")
-            logger.warning(f"[Telethon] ⚠️     systemctl restart bytbit-bot.service")
             
-            if not session_exists:
-                logger.error(f"[Telethon] ❌ Файл сессии {session_file} не найден!")
-                logger.error(f"[Telethon] ❌ Запустите: python3 scripts/init_telethon_session.py")
-                return
-            
-            logger.error(f"[Telethon] ❌ Бот не может запуститься без авторизованной сессии. Создайте сессию вручную.")
-            
-            # Сессия существует, но не авторизована - пробуем через переменные окружения
-            phone = os.getenv("TELEGRAM_PHONE")
-            password = os.getenv("TELEGRAM_PASSWORD")
-            
-            if phone:
-                logger.info(f"[Telethon] Попытка авторизации через номер телефона из переменных окружения")
+            # Пробуем использовать токен бота для авторизации
+            if TOKEN:
+                logger.info(f"[Telethon] Попытка авторизации через токен бота...")
+                logger.warning(f"[Telethon] ⚠️  ВНИМАНИЕ: Авторизация через токен бота не позволит читать историю сообщений!")
+                logger.warning(f"[Telethon] ⚠️  Парсер будет работать только для новых сообщений в реальном времени.")
                 try:
-                    await client.send_code_request(phone)
-                    code = os.getenv("TELEGRAM_CODE")
-                    if code:
-                        await client.sign_in(phone, code, password=password)
-                        logger.info(f"[Telethon] ✅ Авторизация через переменные окружения успешна")
+                    await client.start(bot_token=TOKEN)
+                    is_authorized = await client.is_user_authorized()
+                    if is_authorized:
+                        logger.info(f"[Telethon] ✅ Авторизация через токен бота успешна")
+                        logger.warning(f"[Telethon] ⚠️  Чтение истории сообщений будет пропущено из-за ограничений Telegram API для ботов")
                     else:
-                        logger.error(f"[Telethon] Требуется TELEGRAM_CODE для авторизации")
+                        logger.error(f"[Telethon] ❌ Авторизация через токен бота не удалась")
                         return
                 except Exception as e:
-                    logger.error(f"[Telethon] Ошибка авторизации через переменные окружения: {e}")
+                    logger.error(f"[Telethon] Ошибка авторизации через токен бота: {e}")
                     logger.error(f"[Telethon] Создайте сессию вручную (см. инструкцию выше)")
                     return
             else:
-                logger.error(f"[Telethon] ❌ Сессия не авторизована и нет TELEGRAM_PHONE в переменных окружения")
-                logger.error(f"[Telethon] ❌ Создайте сессию вручную или установите TELEGRAM_PHONE и TELEGRAM_CODE")
-                return
+                logger.warning(f"[Telethon] ⚠️  Возможно, сессия была удалена или повреждена при обновлении.")
+                logger.warning(f"[Telethon] ⚠️  Необходимо пересоздать сессию.")
+                logger.warning(f"[Telethon] ⚠️  Выполните на сервере:")
+                logger.warning(f"[Telethon] ⚠️  1. cd /root/trade_bot")
+                logger.warning(f"[Telethon] ⚠️  2. source .venv/bin/activate")
+                logger.warning(f"[Telethon] ⚠️  3. python3 scripts/init_telethon_session.py")
+                logger.warning(f"[Telethon] ⚠️  4. Введите номер телефона и код подтверждения из Telegram")
+                logger.warning(f"[Telethon] ⚠️  5. После успешной авторизации перезапустите бота:")
+                logger.warning(f"[Telethon] ⚠️     systemctl restart bytbit-bot.service")
+                
+                if not session_exists:
+                    logger.error(f"[Telethon] ❌ Файл сессии {session_file} не найден!")
+                    logger.error(f"[Telethon] ❌ Запустите: python3 scripts/init_telethon_session.py")
+                    return
+                
+                logger.error(f"[Telethon] ❌ Бот не может запуститься без авторизованной сессии. Создайте сессию вручную.")
+                
+                # Сессия существует, но не авторизована - пробуем через переменные окружения
+                phone = os.getenv("TELEGRAM_PHONE")
+                password = os.getenv("TELEGRAM_PASSWORD")
+                
+                if phone:
+                    logger.info(f"[Telethon] Попытка авторизации через номер телефона из переменных окружения")
+                    try:
+                        await client.send_code_request(phone)
+                        code = os.getenv("TELEGRAM_CODE")
+                        if code:
+                            await client.sign_in(phone, code, password=password)
+                            logger.info(f"[Telethon] ✅ Авторизация через переменные окружения успешна")
+                        else:
+                            logger.error(f"[Telethon] Требуется TELEGRAM_CODE для авторизации")
+                            return
+                    except Exception as e:
+                        logger.error(f"[Telethon] Ошибка авторизации через переменные окружения: {e}")
+                        logger.error(f"[Telethon] Создайте сессию вручную (см. инструкцию выше)")
+                        return
+                else:
+                    logger.error(f"[Telethon] ❌ Сессия не авторизована и нет TELEGRAM_PHONE в переменных окружения")
+                    logger.error(f"[Telethon] ❌ Создайте сессию вручную или установите TELEGRAM_PHONE и TELEGRAM_CODE")
+                    return
         
         # Проверяем, что авторизация прошла как пользователь, а не как бот
         me = await client.get_me()
         if me.bot:
-            logger.error("[Telethon] ОШИБКА: Авторизация прошла как бот! Нужна авторизация через номер телефона пользователя.")
-            logger.error("[Telethon] Удалите файл my_session.session и перезапустите бота")
+            logger.warning("[Telethon] ⚠️  Авторизация прошла как бот (используется токен бота)")
+            logger.warning("[Telethon] ⚠️  Парсер будет работать только для новых сообщений, история недоступна")
+            # Пропускаем чтение истории, так как боты не могут читать историю сообщений
+            logger.info("[Telethon] Пропускаем чтение истории сообщений (недоступно для ботов)")
+            logger.info("[Telethon] Начинаю слушать новые сообщения из канала...")
+            await client.run_until_disconnected()
             return
-        
-        logger.info(f"[Telethon] Успешно подключен к Telegram как пользователь: {me.first_name} (@{me.username})")
+        else:
+            logger.info(f"[Telethon] Успешно подключен к Telegram как пользователь: {me.first_name} (@{me.username})")
         
         # Проверяем доступ к каналу
         try:
@@ -296,7 +320,7 @@ async def start_telethon():
             logger.error(f"[Telethon] ❌ Ошибка доступа к каналу {CHANNEL}: {e}")
             return
         
-        # Шаг 2: Читаем последние 50 сообщений из канала
+        # Шаг 2: Читаем последние 50 сообщений из канала (только если авторизован как пользователь)
         # Шаг 3: Находим новые анонсы
         # Шаг 4: Если время Result в будущем — ставим задачу в календарь
         await check_recent_messages()
