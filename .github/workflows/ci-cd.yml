@@ -113,6 +113,9 @@ jobs:
           fi
           
           echo "🔄 Обновление кода из GitHub..."
+          # Убеждаемся что используется HTTPS
+          git remote set-url origin https://github.com/makhotin07/trade_bot.git || true
+          
           # Безопасное обновление без удаления локальных файлов
           git fetch origin master || {
             echo "⚠️  Fetch не удался"
