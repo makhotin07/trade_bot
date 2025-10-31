@@ -93,26 +93,32 @@ jobs:
     
     - name: Deploy to server
       run: |
-        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-          cd ${{ secrets.SERVER_PATH }} || exit
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          set -e
+          cd ${{ secrets.SERVER_PATH }} || exit 1
+          
+          echo "🔄 Обновление кода из GitHub..."
           git pull origin main || git pull origin master
           
-          # Activate virtual environment if exists
+          echo "📦 Обновление зависимостей..."
           if [ -d ".venv" ]; then
             source .venv/bin/activate
           elif [ -d "venv" ]; then
             source venv/bin/activate
           fi
           
-          # Install/update dependencies
-          pip install -r requirements.txt --upgrade
+          pip install -r requirements.txt --upgrade --quiet
           
-          # Restart service (adjust based on your setup)
-          if systemctl is-active --quiet bytbit-bot.service; then
-            sudo systemctl restart bytbit-bot.service
+          echo "🔄 Перезапуск бота..."
+          if systemctl is-active --quiet bytbit-bot.service 2>/dev/null; then
+            systemctl restart bytbit-bot.service
+            echo "✅ Бот перезапущен через systemd"
           elif [ -f "scripts/restart.sh" ]; then
             bash scripts/restart.sh
+            echo "✅ Бот перезапущен через скрипт"
+          else
+            echo "⚠️  Бот не запущен. Запустите вручную: python main.py"
           fi
           
-          echo "Deployment completed successfully"
+          echo "✅ Деплой завершен успешно"
         EOF
