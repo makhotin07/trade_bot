@@ -2,11 +2,16 @@
 Модуль торговли на Bybit
 """
 import logging
+import time
 from pybit.unified_trading import HTTP
 from .utils import get_user_config, round_to_tick_size, round_to_qty_step
 from .config import TP1_PCT, TP2_PCT, STOP_LOSS_PCT, BUY_PCT
 
 logger = logging.getLogger(__name__)
+
+# Максимальное количество попыток размещения ордера
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # секунды между попытками
 
 
 def long_token(token, user_id, bot):
@@ -119,52 +124,152 @@ def long_token(token, user_id, bot):
         logger.info(f"Размещение ордеров: buy={buy_qty}, tp1={tp1_qty}@{tp1}, tp2={tp2_qty}@{tp2}, sl={sl_qty}@{sl}")
         
         # Устанавливаем плечо
-        session.set_leverage(
+        leverage_result = session.set_leverage(
             category="linear",
             symbol=token_symbol,
             buyLeverage=str(int(leverage)),
             sellLeverage=str(int(leverage)),
         )
         
-        # Buy 70% with position SL
-        session.place_order(
-            category="linear",
-            symbol=token_symbol,
-            side="Buy",
-            order_type="Market",
-            qty=round(buy_qty, 0),
-            reduce_only=False,
-            time_in_force="GoodTillCancel",
-            stopLoss=str(sl)  # явное преобразование в строку
-        )
+        if leverage_result.get("retCode") != 0:
+            error_msg = f"❌ Ошибка установки плеча: {leverage_result.get('retMsg', 'Unknown error')}"
+            logger.error(f"[Trading] {error_msg}")
+            bot.send_message(user_id, error_msg)
+            return
+        
+        # Размещаем основной ордер покупки с повторными попытками
+        buy_order_id = None
+        buy_order_success = False
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                logger.info(f"[Trading] Попытка {attempt + 1}/{MAX_RETRIES} размещения ордера покупки для {token_symbol}")
+                
+                buy_order = session.place_order(
+                    category="linear",
+                    symbol=token_symbol,
+                    side="Buy",
+                    order_type="Market",
+                    qty=round(buy_qty, 0),
+                    reduce_only=False,
+                    time_in_force="GoodTillCancel",
+                    stopLoss=str(sl)
+                )
+                
+                if buy_order.get("retCode") == 0:
+                    buy_order_id = buy_order.get("result", {}).get("orderId")
+                    buy_order_success = True
+                    logger.info(f"[Trading] ✅ Ордер покупки размещен успешно. Order ID: {buy_order_id}")
+                    break
+                else:
+                    error_msg = buy_order.get("retMsg", "Unknown error")
+                    logger.warning(f"[Trading] Попытка {attempt + 1} неудачна: {error_msg}")
+                    
+                    # Если это последняя попытка, отправляем ошибку
+                    if attempt == MAX_RETRIES - 1:
+                        error_message = f"❌ Не удалось разместить ордер покупки после {MAX_RETRIES} попыток: {error_msg}"
+                        bot.send_message(user_id, error_message)
+                        return
+                    else:
+                        time.sleep(RETRY_DELAY)
+                        
+            except Exception as e:
+                logger.error(f"[Trading] Исключение при попытке {attempt + 1}: {e}", exc_info=True)
+                if attempt == MAX_RETRIES - 1:
+                    error_message = f"❌ Критическая ошибка при размещении ордера: {str(e)}"
+                    bot.send_message(user_id, error_message)
+                    return
+                time.sleep(RETRY_DELAY)
+        
+        if not buy_order_success:
+            logger.error(f"[Trading] Не удалось разместить ордер покупки после всех попыток")
+            bot.send_message(user_id, f"❌ Не удалось разместить ордер покупки для {token_symbol}")
+            return
+        
+        # Проверяем, что позиция действительно открылась
+        time.sleep(1)  # Даём время на обработку ордера
+        
+        try:
+            positions = session.get_open_positions(
+                category="linear",
+                symbol=token_symbol,
+            )
+            
+            if positions.get("retCode") == 0:
+                position_list = positions.get("result", {}).get("list", [])
+                position_found = any(
+                    pos.get("symbol") == token_symbol and 
+                    float(pos.get("size", 0)) > 0 
+                    for pos in position_list
+                )
+                
+                if not position_found:
+                    logger.warning(f"[Trading] Позиция {token_symbol} не найдена после размещения ордера")
+                    bot.send_message(
+                        user_id,
+                        f"⚠️ Ордер {token_symbol} размещен, но позиция не обнаружена. Проверьте вручную."
+                    )
+        except Exception as e:
+            logger.error(f"[Trading] Ошибка проверки позиции: {e}", exc_info=True)
+            # Не блокируем выполнение, продолжаем размещать TP ордера
+        
+        # Размещаем TP ордера
+        tp_orders_placed = []
         
         # TP1 limit sell 40%
         if tp1_qty >= min_qty:
-            session.place_order(
-                category="linear",
-                symbol=token_symbol,
-                side="Sell",
-                order_type="Limit",
-                qty=round(tp1_qty, 0),
-                price=str(tp1),  # явное преобразование в строку
-                reduce_only=True,
-                time_in_force="GoodTillCancel"
-            )
+            try:
+                tp1_order = session.place_order(
+                    category="linear",
+                    symbol=token_symbol,
+                    side="Sell",
+                    order_type="Limit",
+                    qty=round(tp1_qty, 0),
+                    price=str(tp1),
+                    reduce_only=True,
+                    time_in_force="GoodTillCancel"
+                )
+                
+                if tp1_order.get("retCode") == 0:
+                    tp_orders_placed.append(f"TP1@{tp1}")
+                    logger.info(f"[Trading] ✅ TP1 ордер размещен успешно")
+                else:
+                    logger.warning(f"[Trading] ⚠️ TP1 ордер не размещен: {tp1_order.get('retMsg')}")
+            except Exception as e:
+                logger.error(f"[Trading] Ошибка размещения TP1: {e}", exc_info=True)
         
         # TP2 limit sell 30%
         if tp2_qty >= min_qty:
-            session.place_order(
-                category="linear",
-                symbol=token_symbol,
-                side="Sell",
-                order_type="Limit",
-                qty=round(tp2_qty, 0),
-                price=str(tp2),  # явное преобразование в строку
-                reduce_only=True,
-                time_in_force="GoodTillCancel"
-            )
+            try:
+                tp2_order = session.place_order(
+                    category="linear",
+                    symbol=token_symbol,
+                    side="Sell",
+                    order_type="Limit",
+                    qty=round(tp2_qty, 0),
+                    price=str(tp2),
+                    reduce_only=True,
+                    time_in_force="GoodTillCancel"
+                )
+                
+                if tp2_order.get("retCode") == 0:
+                    tp_orders_placed.append(f"TP2@{tp2}")
+                    logger.info(f"[Trading] ✅ TP2 ордер размещен успешно")
+                else:
+                    logger.warning(f"[Trading] ⚠️ TP2 ордер не размещен: {tp2_order.get('retMsg')}")
+            except Exception as e:
+                logger.error(f"[Trading] Ошибка размещения TP2: {e}", exc_info=True)
         
-        bot.send_message(user_id, f"✅ Лонг по {token_symbol} выполнен по цене {price:.2f}")
+        # Формируем итоговое сообщение
+        tp_info = f", размещены TP: {', '.join(tp_orders_placed)}" if tp_orders_placed else ""
+        success_message = (
+            f"✅ Лонг по {token_symbol} выполнен\n"
+            f"Цена входа: {price:.4f} USDT\n"
+            f"Объём: {buy_qty:.2f} {token_symbol.replace('USDT', '')}\n"
+            f"SL: {sl:.4f} USDT{tp_info}"
+        )
+        
+        bot.send_message(user_id, success_message)
         
     except Exception as err:
         logger.error(f'Error while placing order for {token}: {err}', exc_info=True)
