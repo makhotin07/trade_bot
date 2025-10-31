@@ -4,12 +4,19 @@ After=network.target
 
 [Service]
 Type=simple
-User=your_user
-WorkingDirectory=/path/to/bytbit-trading-bot
-Environment="PATH=/path/to/bytbit-trading-bot/.venv/bin"
-ExecStart=/path/to/bytbit-trading-bot/.venv/bin/python main.py
+User=root
+WorkingDirectory=/root/trade_bot
+Environment="PATH=/root/trade_bot/.venv/bin"
+Environment="PYTHONPATH=/root/trade_bot/src"
+ExecStart=/root/trade_bot/.venv/bin/python /root/trade_bot/main.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Ограничение ресурсов (опционально)
+MemoryMax=800M
+MemoryHigh=700M
 
 [Install]
 WantedBy=multi-user.target
