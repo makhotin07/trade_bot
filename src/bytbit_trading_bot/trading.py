@@ -9,9 +9,8 @@ from .config import TP1_PCT, TP2_PCT, STOP_LOSS_PCT, BUY_PCT
 
 logger = logging.getLogger(__name__)
 
-# Максимальное количество попыток размещения ордера
 MAX_RETRIES = 3
-RETRY_DELAY = 2  # секунды между попытками
+RETRY_DELAY = 2
 
 
 def get_balance(user_id, bot):
@@ -107,7 +106,6 @@ def get_balance(user_id, bot):
                 balance_text = "💰 Баланс USDT: 0.0000 USDT"
         
         bot.send_message(user_id, balance_text, parse_mode='Markdown')
-        logger.info(f"[Trading] Баланс успешно получен для пользователя {user_id}")
         
     except Exception as err:
         logger.error(f'Error while getting balance for user {user_id}: {err}', exc_info=True)
@@ -223,8 +221,6 @@ def long_token(token, user_id, bot):
         
         sl_qty = buy_qty * 0.3  # 30% от позиции для стоп-лосса
         
-        logger.info(f"Размещение ордеров: buy={buy_qty}, tp1={tp1_qty}@{tp1}, tp2={tp2_qty}@{tp2}, sl={sl_qty}@{sl}")
-        
         # Устанавливаем плечо
         leverage_result = session.set_leverage(
             category="linear",
@@ -245,8 +241,6 @@ def long_token(token, user_id, bot):
         
         for attempt in range(MAX_RETRIES):
             try:
-                logger.info(f"[Trading] Попытка {attempt + 1}/{MAX_RETRIES} размещения ордера покупки для {token_symbol}")
-                
                 buy_order = session.place_order(
                     category="linear",
                     symbol=token_symbol,
@@ -261,7 +255,14 @@ def long_token(token, user_id, bot):
                 if buy_order.get("retCode") == 0:
                     buy_order_id = buy_order.get("result", {}).get("orderId")
                     buy_order_success = True
-                    logger.info(f"[Trading] ✅ Ордер покупки размещен успешно. Order ID: {buy_order_id}")
+                    buy_msg = (
+                        f"🛒 Ордер покупки размещен\n"
+                        f"Токен: {token_symbol}\n"
+                        f"Order ID: {buy_order_id}\n"
+                        f"Цена: {price:.4f} USDT\n"
+                        f"Объём: {buy_qty:.2f}"
+                    )
+                    bot.send_message(user_id, buy_msg)
                     break
                 else:
                     error_msg = buy_order.get("retMsg", "Unknown error")
@@ -333,12 +334,23 @@ def long_token(token, user_id, bot):
                 )
                 
                 if tp1_order.get("retCode") == 0:
+                    tp1_order_id = tp1_order.get("result", {}).get("orderId", "N/A")
                     tp_orders_placed.append(f"TP1@{tp1}")
-                    logger.info(f"[Trading] ✅ TP1 ордер размещен успешно")
+                    tp1_msg = (
+                        f"✅ TP1 ордер размещен\n"
+                        f"Токен: {token_symbol}\n"
+                        f"Order ID: {tp1_order_id}\n"
+                        f"Цена: {tp1:.4f} USDT\n"
+                        f"Объём: {tp1_qty:.2f}"
+                    )
+                    bot.send_message(user_id, tp1_msg)
                 else:
-                    logger.warning(f"[Trading] ⚠️ TP1 ордер не размещен: {tp1_order.get('retMsg')}")
+                    error_msg = tp1_order.get("retMsg", "Unknown error")
+                    logger.warning(f"[Trading] TP1 ордер не размещен: {error_msg}")
+                    bot.send_message(user_id, f"❌ Ошибка размещения TP1 для {token_symbol}: {error_msg}")
             except Exception as e:
                 logger.error(f"[Trading] Ошибка размещения TP1: {e}", exc_info=True)
+                bot.send_message(user_id, f"❌ Критическая ошибка размещения TP1 для {token_symbol}: {str(e)}")
         
         # TP2 limit sell 30%
         if tp2_qty >= min_qty:
@@ -355,20 +367,33 @@ def long_token(token, user_id, bot):
                 )
                 
                 if tp2_order.get("retCode") == 0:
+                    tp2_order_id = tp2_order.get("result", {}).get("orderId", "N/A")
                     tp_orders_placed.append(f"TP2@{tp2}")
-                    logger.info(f"[Trading] ✅ TP2 ордер размещен успешно")
+                    tp2_msg = (
+                        f"✅ TP2 ордер размещен\n"
+                        f"Токен: {token_symbol}\n"
+                        f"Order ID: {tp2_order_id}\n"
+                        f"Цена: {tp2:.4f} USDT\n"
+                        f"Объём: {tp2_qty:.2f}"
+                    )
+                    bot.send_message(user_id, tp2_msg)
                 else:
-                    logger.warning(f"[Trading] ⚠️ TP2 ордер не размещен: {tp2_order.get('retMsg')}")
+                    error_msg = tp2_order.get("retMsg", "Unknown error")
+                    logger.warning(f"[Trading] TP2 ордер не размещен: {error_msg}")
+                    bot.send_message(user_id, f"❌ Ошибка размещения TP2 для {token_symbol}: {error_msg}")
             except Exception as e:
                 logger.error(f"[Trading] Ошибка размещения TP2: {e}", exc_info=True)
+                bot.send_message(user_id, f"❌ Критическая ошибка размещения TP2 для {token_symbol}: {str(e)}")
         
-        # Формируем итоговое сообщение
-        tp_info = f", размещены TP: {', '.join(tp_orders_placed)}" if tp_orders_placed else ""
+        # Итоговое сообщение о выполнении покупки
+        tp_info = f"\n✅ Размещены TP: {', '.join(tp_orders_placed)}" if tp_orders_placed else "\n⚠️ TP ордера не размещены"
         success_message = (
-            f"✅ Лонг по {token_symbol} выполнен\n"
-            f"Цена входа: {price:.4f} USDT\n"
-            f"Объём: {buy_qty:.2f} {token_symbol.replace('USDT', '')}\n"
-            f"SL: {sl:.4f} USDT{tp_info}"
+            f"✅ Покупка {token_symbol} завершена\n\n"
+            f"💰 Цена входа: {price:.4f} USDT\n"
+            f"📊 Объём: {buy_qty:.2f} {token_symbol.replace('USDT', '')}\n"
+            f"🛡️ Stop Loss: {sl:.4f} USDT\n"
+            f"📈 Плечо: {leverage}x\n"
+            f"💵 Маржа: {margin} USDT{tp_info}"
         )
         
         bot.send_message(user_id, success_message)

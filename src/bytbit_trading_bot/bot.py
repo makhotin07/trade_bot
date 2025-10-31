@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 bot = telebot.TeleBot(TOKEN)
 
-# Функция для получения scheduler (импортируется лениво, чтобы избежать циклических импортов)
 def get_scheduler():
     """Получает экземпляр планировщика"""
     try:
@@ -183,28 +182,19 @@ def process_leverage(message):
 def list_tokens(message):
     """Показывает список запланированных токенов"""
     try:
-        # Логируем путь к файлу для отладки
-        logger.info(f"[Bot] Команда /list: ищем файл {TOKENS_FILE}")
-        logger.info(f"[Bot] Файл существует: {os.path.exists(TOKENS_FILE)}")
-        
         tokens = load_json(TOKENS_FILE)
-        logger.info(f"[Bot] Загружено токенов из файла: {len(tokens)}")
         
         if not tokens:
             bot.reply_to(message, "📋 Нет запланированных токенов")
-            logger.warning(f"[Bot] Файл {TOKENS_FILE} пуст или не найден")
             return
         
-        # Получаем задачи из планировщика
         scheduled_jobs = []
         scheduler = get_scheduler()
         if scheduler:
-            jobs = scheduler.get_jobs()
-            scheduled_jobs = {job.id for job in jobs}
+            scheduled_jobs = {job.id for job in scheduler.get_jobs()}
         
         text = "📋 Запланированные токены:\n\n"
         
-        # Сортируем токены по дате result
         sorted_tokens = sorted(
             tokens.items(),
             key=lambda x: x[1].get("result_datetime", ""),
@@ -219,12 +209,10 @@ def list_tokens(message):
             token = token_data.get("token", "N/A")
             result_datetime_str = token_data.get("result_datetime")
             
-            # Проверяем, активна ли задача в планировщике
             is_scheduled = False
             if result_datetime_str:
                 try:
                     result_date = datetime.fromisoformat(result_datetime_str)
-                    # Убеждаемся, что дата в московском времени
                     if result_date.tzinfo is None:
                         result_date = tz_moscow.localize(result_date)
                     else:
@@ -233,16 +221,13 @@ def list_tokens(message):
                     job_id = f"token_{token}_{result_date.isoformat()}"
                     is_scheduled = job_id in scheduled_jobs
                     
-                    # Проверяем, что дата в будущем
                     if result_date > now:
                         future_count += 1
                         status = "✅" if is_scheduled else "⚠️"
-                        # Форматируем дату в московском времени
                         date_formatted = result_date.strftime("%d.%m.%Y %H:%M")
                         text += f"{status} {token} - {date_formatted} MSK\n"
                 except Exception as e:
                     logger.error(f"Error processing token {token}: {e}")
-                    pass
         
         if future_count == 0:
             text = "📋 Нет активных запланированных токенов (все даты прошли)"

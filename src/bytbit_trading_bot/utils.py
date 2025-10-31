@@ -10,33 +10,22 @@ from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
-# Базовая директория проекта
-# Определяем корень проекта: поднимаемся на 2 уровня вверх от utils.py (src/bytbit_trading_bot/utils.py -> src/ -> корень проекта)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # src/bytbit_trading_bot
-PROJECT_ROOT = os.path.dirname(os.path.dirname(BASE_DIR))  # корень проекта
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(BASE_DIR))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 TOKENS_FILE = os.path.join(DATA_DIR, "tokens.json")
 
-# Логируем пути при инициализации модуля
-logger.info(f"[Utils] Инициализация путей: PROJECT_ROOT={PROJECT_ROOT}, DATA_DIR={DATA_DIR}")
-logger.info(f"[Utils] USERS_FILE={USERS_FILE}, TOKENS_FILE={TOKENS_FILE}")
-
 
 def load_json(file_path):
     """Загружает JSON файл"""
-    logger.debug(f"Загрузка данных из {file_path}")
     if os.path.exists(file_path):
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                logger.debug(f"✅ Данные успешно загружены из {file_path}, записей: {len(data)}")
-                return data
+                return json.load(f)
         except Exception as e:
             logger.error(f"Error loading {file_path}: {e}", exc_info=True)
             return {}
-    else:
-        logger.debug(f"Файл {file_path} не существует, возвращаем пустой словарь")
     return {}
 
 
@@ -46,7 +35,6 @@ def save_json(file_path, data):
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info(f"✅ Данные успешно сохранены в {file_path}")
     except Exception as e:
         logger.error(f"Error saving {file_path}: {e}", exc_info=True)
 
@@ -55,27 +43,16 @@ def parse_result_date(date_str):
     """
     Парсит дату из формата DD.MM.YYYY HH:MM или DD.MM.YYYY HH:MM UTC
     Если указано UTC, конвертирует в московское время (UTC+3)
-    Возвращает datetime объект с часовым поясом Europe/Moscow
     """
     try:
-        # Проверяем, есть ли UTC в строке
         is_utc = 'UTC' in date_str.upper()
-        
-        # Убираем "UTC" если есть
         date_str = date_str.strip().replace(' UTC', '').replace('UTC', '').strip()
-        
-        # Парсим дату
         dt = datetime.strptime(date_str, "%d.%m.%Y %H:%M")
         
+        tz_moscow = pytz.timezone("Europe/Moscow")
         if is_utc:
-            # Если указано UTC, сначала локализуем как UTC, затем конвертируем в Moscow
-            tz_utc = pytz.timezone("UTC")
-            tz_moscow = pytz.timezone("Europe/Moscow")
-            dt = tz_utc.localize(dt)
-            dt = dt.astimezone(tz_moscow)
+            dt = pytz.timezone("UTC").localize(dt).astimezone(tz_moscow)
         else:
-            # Если UTC не указано, предполагаем московское время
-            tz_moscow = pytz.timezone("Europe/Moscow")
             dt = tz_moscow.localize(dt)
         
         return dt
