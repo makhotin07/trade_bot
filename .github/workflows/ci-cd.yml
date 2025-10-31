@@ -124,27 +124,15 @@ jobs:
           # Убеждаемся что используется HTTPS
           git remote set-url origin https://github.com/makhotin07/trade_bot.git || true
           
-          # Обновляем код, но сохраняем файлы из .gitignore (data/, my_session.session и т.д.)
-          # Эти файлы не будут затронуты git pull, так как они в .gitignore
-          git fetch origin master || {
-            echo "⚠️  Fetch не удался"
-            exit 1
-          }
-          
-          # Используем merge с --no-commit чтобы не потерять локальные файлы
-          git merge origin/master --no-commit --no-edit || {
-            # Если merge не удался, пробуем reset но сохраняем данные
-            echo "⚠️  Merge не удался, используем reset но сохраняем данные..."
-            git reset --hard origin/master || {
-              echo "⚠️  Reset не удался, отменяем изменения"
+          # Обновляем код из GitHub
+          # Файлы из .gitignore (data/, my_session.session) не будут затронуты git pull
+          git pull origin master || {
+            echo "⚠️  Pull не удался, пробуем merge..."
+            git merge origin/master --no-edit || {
+              echo "⚠️  Merge не удался"
               git merge --abort 2>/dev/null || true
             }
           }
-          
-          # Если merge был с --no-commit, завершаем его
-          if [ -n "$(git status --porcelain | grep -v '^??')" ]; then
-            git commit --no-edit || echo "⚠️  Нет изменений для коммита"
-          fi
           
           # Восстанавливаем директорию data, если она была удалена
           if [ ! -d "data" ]; then
