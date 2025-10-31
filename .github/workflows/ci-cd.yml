@@ -156,11 +156,8 @@ jobs:
           if systemctl is-active --quiet bytbit-bot.service 2>/dev/null; then
             systemctl restart bytbit-bot.service
             echo "✅ Бот перезапущен через systemd"
-          elif [ -f "scripts/restart.sh" ]; then
-            bash scripts/restart.sh
-            echo "✅ Бот перезапущен через скрипт"
           else
-            echo "⚠️  Бот не запущен. Запустите вручную: python main.py"
+            echo "⚠️  Бот не запущен. Запустите вручную: systemctl start bytbit-bot.service"
           fi
           
           echo "✅ Деплой завершен успешно"

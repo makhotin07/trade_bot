@@ -56,17 +56,7 @@ python main.py
 
 ### Ручное развертывание
 
-#### Способ 1: Использование скрипта деплоя
-
-```bash
-# На вашем локальном компьютере
-./scripts/deploy_manual.sh
-
-# Или с указанием параметров сервера
-SERVER_USER=root SERVER_HOST=91.229.8.171 SERVER_PATH=/root/trade_bot ./scripts/deploy_manual.sh
-```
-
-#### Способ 2: Ручное обновление на сервере
+Ручное обновление на сервере:
 
 ```bash
 # 1. Подключитесь к серверу
@@ -135,8 +125,8 @@ journalctl -u bytbit-bot.service -f
 │   ├── scheduler.py         # Планировщик
 │   └── config.py            # Конфигурация
 ├── scripts/                  # Скрипты
-│   ├── init_telethon_session.py  # Инициализация сессии
-│   └── bytbit-bot.service   # Systemd service
+│   ├── init_telethon_session.py  # Инициализация Telethon сессии
+│   └── bytbit-bot.service   # Systemd service файл
 ├── main.py                  # Точка входа
 └── requirements.txt         # Зависимости
 ```
