@@ -134,8 +134,17 @@ async def start_telethon():
         logger.error("[Telethon] API_ID или API_HASH не настроены")
         return
     
+    # Определяем путь к файлу сессии
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(script_dir))
+    session_path = os.path.join(project_root, f"{SESSION_NAME}.session")
+    
+    # Если файл сессии не найден в корне проекта, используем относительный путь
+    if not os.path.exists(session_path):
+        session_path = SESSION_NAME
+    
     # Создаём клиент Telethon с вашими API credentials
-    client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+    client = TelegramClient(session_path, API_ID, API_HASH)
     
     # Обработчик новых сообщений (для работы в реальном времени)
     @client.on(events.NewMessage(chats=CHANNEL))
@@ -147,9 +156,17 @@ async def start_telethon():
             logger.error(f"[Telethon] Ошибка обработки сообщения: {e}", exc_info=True)
     
     try:
-        # Проверяем существование файла сессии
-        session_file = f"{SESSION_NAME}.session"
+        # Проверяем существование файла сессии (используем абсолютный путь)
+        # Определяем рабочую директорию проекта
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))  # поднимаемся на 2 уровня вверх от parser.py
+        session_file = os.path.join(project_root, f"{SESSION_NAME}.session")
         session_exists = os.path.exists(session_file)
+        
+        # Если не нашли в корне проекта, пробуем в текущей директории
+        if not session_exists:
+            session_file = f"{SESSION_NAME}.session"
+            session_exists = os.path.exists(session_file)
         
         # Шаг 1: Подключаемся к Telegram через ваш аккаунт (НЕ через бота!)
         # Сначала пытаемся подключиться без интерактивного ввода
