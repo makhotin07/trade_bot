@@ -5,22 +5,17 @@
 ## Settings → Secrets and variables → Actions → New repository secret
 
 ### 1. SSH_PRIVATE_KEY
-Содержимое файла `~/.ssh/id_github_actions`:
+Содержимое файла `~/.ssh/id_github_actions` (весь файл полностью):
 
-```
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-...
-(весь файл полностью)
-...
------END OPENSSH PRIVATE KEY-----
-```
-
-**Как получить:**
+Выполните на вашем компьютере:
 ```bash
 cat ~/.ssh/id_github_actions
-# Скопируйте ВСЁ содержимое файла
 ```
+
+Скопируйте **ВСЁ** содержимое файла, включая строки:
+- `-----BEGIN OPENSSH PRIVATE KEY-----`
+- Весь ключ
+- `-----END OPENSSH PRIVATE KEY-----`
 
 ### 2. SERVER_HOST
 ```
