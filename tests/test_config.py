@@ -1,6 +1,12 @@
 import pytest
-from bytbit_trading_bot.config import POST_REGEX
+import sys
+import os
 import re
+
+# Добавляем src в путь для импорта
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from bytbit_trading_bot.config import POST_REGEX
 
 
 def test_post_regex():

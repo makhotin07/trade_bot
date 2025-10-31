@@ -1,4 +1,10 @@
 import pytest
+import sys
+import os
+
+# Добавляем src в путь для импорта
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 from bytbit_trading_bot.utils import parse_result_date, round_to_tick_size, round_to_qty_step
 
 
