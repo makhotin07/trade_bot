@@ -201,7 +201,20 @@ async def start_telethon():
     async def handler(event):
         """Обработчик новых сообщений из канала"""
         try:
-            await process_message(event.message.text)
+            logger.info(f"[Telethon] 📩 Получено новое сообщение из канала {CHANNEL}")
+            
+            if not event.message.text:
+                logger.debug(f"[Telethon] Сообщение не содержит текста, пропускаем")
+                return
+            
+            message_text = event.message.text
+            logger.info(f"[Telethon] Текст сообщения (первые 200 символов): {message_text[:200]}")
+            
+            result = await process_message(message_text)
+            if result:
+                logger.info(f"[Telethon] ✅ Сообщение успешно обработано, токен добавлен")
+            else:
+                logger.debug(f"[Telethon] Сообщение не обработано (не соответствует паттерну или токен уже существует)")
         except Exception as e:
             logger.error(f"[Telethon] Ошибка обработки сообщения: {e}", exc_info=True)
     
