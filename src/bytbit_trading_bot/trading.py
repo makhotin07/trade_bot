@@ -14,6 +14,96 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2  # секунды между попытками
 
 
+def get_balance(user_id, bot):
+    """
+    Получает текущий баланс счета на Bybit
+    
+    Args:
+        user_id: ID пользователя Telegram
+        bot: Экземпляр Telegram бота
+    """
+    try:
+        user_config = get_user_config(user_id)
+        
+        if not user_config.get("api_key") or not user_config.get("api_secret"):
+            bot.send_message(user_id, "❌ Не настроены API ключи Bybit")
+            return
+        
+        api_key = user_config["api_key"]
+        api_secret = user_config["api_secret"]
+        
+        session = HTTP(
+            testnet=False,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        
+        # Получаем баланс Unified Trading Account
+        balance_response = session.get_wallet_balance(
+            accountType="UNIFIED",
+            coin="USDT",
+        )
+        
+        if balance_response.get("retCode") != 0:
+            error_msg = balance_response.get("retMsg", "Unknown error")
+            bot.send_message(user_id, f"❌ Ошибка получения баланса: {error_msg}")
+            logger.error(f"[Trading] Ошибка получения баланса: {error_msg}")
+            return
+        
+        result = balance_response.get("result", {})
+        if not result.get("list"):
+            bot.send_message(user_id, "❌ Данные баланса не найдены")
+            return
+        
+        account = result["list"][0]
+        coin_list = account.get("coin", [])
+        
+        if not coin_list:
+            bot.send_message(user_id, "❌ Информация о монетах не найдена")
+            return
+        
+        # Формируем сообщение с балансом
+        balance_text = "💰 Текущий баланс:\n\n"
+        
+        for coin in coin_list:
+            coin_name = coin.get("coin", "N/A")
+            wallet_balance = float(coin.get("walletBalance", 0))
+            available_balance = float(coin.get("availableToWithdraw", 0))
+            locked = float(coin.get("locked", 0))
+            
+            if wallet_balance > 0 or locked > 0:
+                balance_text += (
+                    f"**{coin_name}**\n"
+                    f"Доступно: {wallet_balance:.4f}\n"
+                    f"Заблокировано: {locked:.4f}\n"
+                    f"Доступно к выводу: {available_balance:.4f}\n\n"
+                )
+        
+        # Если нет баланса, показываем только USDT
+        if "USDT" not in balance_text:
+            usdt_coin = next((c for c in coin_list if c.get("coin") == "USDT"), None)
+            if usdt_coin:
+                wallet_balance = float(usdt_coin.get("walletBalance", 0))
+                available_balance = float(usdt_coin.get("availableToWithdraw", 0))
+                locked = float(usdt_coin.get("locked", 0))
+                
+                balance_text = (
+                    f"💰 Баланс USDT:\n\n"
+                    f"Доступно: {wallet_balance:.4f} USDT\n"
+                    f"Заблокировано: {locked:.4f} USDT\n"
+                    f"Доступно к выводу: {available_balance:.4f} USDT"
+                )
+            else:
+                balance_text = "💰 Баланс USDT: 0.0000 USDT"
+        
+        bot.send_message(user_id, balance_text, parse_mode='Markdown')
+        logger.info(f"[Trading] Баланс успешно получен для пользователя {user_id}")
+        
+    except Exception as err:
+        logger.error(f'Error while getting balance for user {user_id}: {err}', exc_info=True)
+        bot.send_message(user_id, f"❌ Ошибка получения баланса: {str(err)}")
+
+
 def long_token(token, user_id, bot):
     """
     Открывает длинную позицию по токену

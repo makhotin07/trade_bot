@@ -43,6 +43,7 @@ def start_message(message):
         "Команды:\n"
         "/start - Начать работу\n"
         "/status - Статус бота\n"
+        "/balance - Текущий баланс\n"
         "/list - Список запланированных токенов\n"
         "/enable - Включить бота\n"
         "/disable - Выключить бота\n"
@@ -246,6 +247,14 @@ def list_tokens(message):
     except Exception as e:
         logger.error(f"Error listing tokens: {e}", exc_info=True)
         bot.reply_to(message, f"❌ Ошибка получения списка: {str(e)}")
+
+
+@bot.message_handler(commands=['balance'])
+def balance_message(message):
+    """Показывает текущий баланс на Bybit"""
+    user_id = message.from_user.id
+    from .trading import get_balance
+    get_balance(user_id, bot)
 
 
 @bot.message_handler(commands=['set_margin'])
