@@ -2,6 +2,11 @@
 """
 Скрипт для первичной авторизации Telethon
 Запустите один раз для создания сессии
+
+Использование:
+    cd /root/trade_bot
+    source .venv/bin/activate
+    python3 scripts/init_telethon_session.py
 """
 import sys
 import os
@@ -12,6 +17,14 @@ project_root = os.path.dirname(script_dir)
 
 # Добавляем src в путь
 sys.path.insert(0, os.path.join(project_root, 'src'))
+
+# Проверяем, что мы в виртуальном окружении
+if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+    venv_path = os.path.join(project_root, '.venv')
+    if os.path.exists(venv_path):
+        print("⚠️  Виртуальное окружение не активировано!")
+        print(f"   Выполните: source {venv_path}/bin/activate")
+        print("   Или запустите: .venv/bin/python3 scripts/init_telethon_session.py")
 
 import asyncio
 from bytbit_trading_bot.parser import start_telethon
