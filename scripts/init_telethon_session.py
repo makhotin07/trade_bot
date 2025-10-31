@@ -6,8 +6,12 @@
 import sys
 import os
 
+# Определяем корневую директорию проекта
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+
 # Добавляем src в путь
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
 import asyncio
 from bytbit_trading_bot.parser import start_telethon
