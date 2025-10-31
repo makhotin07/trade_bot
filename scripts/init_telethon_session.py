@@ -23,7 +23,7 @@ project_root = os.path.dirname(script_dir)
 sys.path.insert(0, os.path.join(project_root, 'src'))
 
 from telethon import TelegramClient
-from bytbit_trading_bot.config import API_ID, API_HASH, SESSION_NAME, CHANNEL, TOKEN
+from bytbit_trading_bot.config import API_ID, API_HASH, SESSION_NAME, CHANNEL
 
 
 async def init_telethon_session():
