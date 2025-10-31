@@ -34,7 +34,7 @@ async def process_message(message_text):
         return False
     
     # Парсим сообщение по регулярке (ищем формат: ТОКЕН\n...Result DD.MM.YYYY HH:MM UTC или без UTC)
-    logger.debug(f"[Telethon] Обработка сообщения (первые 200 символов): {message_text[:200]}")
+    logger.info(f"[Telethon] 🔍 Обработка сообщения (первые 500 символов): {message_text[:500]}")
     
     # Сначала пробуем re.match (с начала строки)
     match = re.match(POST_REGEX, message_text, re.DOTALL | re.MULTILINE)
@@ -43,20 +43,30 @@ async def process_message(message_text):
     if not match:
         match = re.search(POST_REGEX, message_text, re.DOTALL | re.MULTILINE)
         if match:
-            logger.info(f"[Telethon] Паттерн найден через re.search (не с начала строки)")
+            logger.info(f"[Telethon] ✅ Паттерн найден через re.search (не с начала строки)")
     
     if not match:
-        # Логируем только первые 5 несовпавших сообщений, чтобы не засорять логи
-        logger.debug(f"[Telethon] Сообщение не соответствует паттерну: {message_text[:100]}")
+        # Всегда логируем сообщения с "Result" для отладки
+        logger.warning(f"[Telethon] ⚠️  Сообщение не соответствует паттерну!")
+        logger.warning(f"[Telethon] ⚠️  Паттерн: {POST_REGEX}")
+        
         # Проверяем, есть ли хотя бы слово "Result" в сообщении
         if "Result" in message_text or "result" in message_text.lower():
-            logger.warning(f"[Telethon] ⚠️  В сообщении есть 'Result', но оно не совпало с паттерном!")
-            logger.warning(f"[Telethon] ⚠️  Паттерн: {POST_REGEX}")
-            logger.warning(f"[Telethon] ⚠️  Сообщение: {message_text[:500]}")
+            logger.warning(f"[Telethon] ⚠️  В сообщении есть 'Result', но паттерн не совпал!")
+            logger.warning(f"[Telethon] ⚠️  Полный текст сообщения: {message_text}")
             # Пытаемся найти токен вручную
             lines = message_text.split('\n')
-            if len(lines) > 0:
-                logger.warning(f"[Telethon] ⚠️  Первая строка сообщения: {lines[0]}")
+            logger.warning(f"[Telethon] ⚠️  Всего строк в сообщении: {len(lines)}")
+            for i, line in enumerate(lines[:5]):  # Показываем первые 5 строк
+                logger.warning(f"[Telethon] ⚠️  Строка {i+1}: {line[:100]}")
+            
+            # Пробуем найти дату вручную
+            date_pattern = r'(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})'
+            date_matches = re.findall(date_pattern, message_text)
+            if date_matches:
+                logger.warning(f"[Telethon] ⚠️  Найдены даты в сообщении: {date_matches}")
+        else:
+            logger.debug(f"[Telethon] Сообщение не содержит 'Result', пропускаем")
         return False
     
     # Извлекаем токен и дату Result
@@ -204,17 +214,17 @@ async def start_telethon():
             logger.info(f"[Telethon] 📩 Получено новое сообщение из канала {CHANNEL}")
             
             if not event.message.text:
-                logger.debug(f"[Telethon] Сообщение не содержит текста, пропускаем")
+                logger.warning(f"[Telethon] ⚠️  Сообщение не содержит текста, пропускаем")
                 return
             
             message_text = event.message.text
-            logger.info(f"[Telethon] Текст сообщения (первые 200 символов): {message_text[:200]}")
+            logger.info(f"[Telethon] 📝 Текст сообщения (первые 300 символов): {message_text[:300]}")
             
             result = await process_message(message_text)
             if result:
                 logger.info(f"[Telethon] ✅ Сообщение успешно обработано, токен добавлен")
             else:
-                logger.debug(f"[Telethon] Сообщение не обработано (не соответствует паттерну или токен уже существует)")
+                logger.info(f"[Telethon] ℹ️  Сообщение не обработано (не соответствует паттерну или токен уже существует)")
         except Exception as e:
             logger.error(f"[Telethon] Ошибка обработки сообщения: {e}", exc_info=True)
     
@@ -329,8 +339,10 @@ async def start_telethon():
         try:
             entity = await client.get_entity(CHANNEL)
             logger.info(f"[Telethon] ✅ Канал доступен: {entity.title} (ID: {entity.id})")
+            logger.info(f"[Telethon] 📌 Подписка на канал для получения новых сообщений...")
         except Exception as e:
             logger.error(f"[Telethon] ❌ Ошибка доступа к каналу {CHANNEL}: {e}")
+            logger.error(f"[Telethon] ❌ Убедитесь, что бот добавлен в канал или канал публичный")
             return
         
         # Шаг 2: Читаем последние 50 сообщений из канала (только если авторизован как пользователь)
