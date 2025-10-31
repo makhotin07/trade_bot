@@ -124,29 +124,27 @@ jobs:
           # Убеждаемся что используется HTTPS
           git remote set-url origin https://github.com/makhotin07/trade_bot.git || true
           
-          # Сохраняем локальные изменения (stash) перед pull
-          git stash push -m "Local changes before deploy $(date +%Y%m%d_%H%M%S)" || echo "⚠️  Нет локальных изменений для сохранения"
-          
-          # Безопасное обновление без удаления локальных файлов
+          # Обновляем код, но сохраняем файлы из .gitignore (data/, my_session.session и т.д.)
+          # Эти файлы не будут затронуты git pull, так как они в .gitignore
           git fetch origin master || {
             echo "⚠️  Fetch не удался"
             exit 1
           }
           
-          # Пытаемся обновить код, но не удаляем локальные изменения
-          if git pull origin master 2>/dev/null; then
-            echo "✅ Код успешно обновлен через pull"
-          else
-            echo "⚠️  Pull не удался, пробуем merge..."
-            git merge origin/master --no-edit || {
-              echo "⚠️  Merge не удался, но сохраняем локальные файлы"
-              # Отменяем merge, но сохраняем локальные файлы
+          # Используем merge с --no-commit чтобы не потерять локальные файлы
+          git merge origin/master --no-commit --no-edit || {
+            # Если merge не удался, пробуем reset но сохраняем данные
+            echo "⚠️  Merge не удался, используем reset но сохраняем данные..."
+            git reset --hard origin/master || {
+              echo "⚠️  Reset не удался, отменяем изменения"
               git merge --abort 2>/dev/null || true
             }
-          fi
+          }
           
-          # Восстанавливаем локальные изменения (включая данные)
-          git stash pop || echo "⚠️  Нет сохраненных изменений для восстановления"
+          # Если merge был с --no-commit, завершаем его
+          if [ -n "$(git status --porcelain | grep -v '^??')" ]; then
+            git commit --no-edit || echo "⚠️  Нет изменений для коммита"
+          fi
           
           # Восстанавливаем директорию data, если она была удалена
           if [ ! -d "data" ]; then
