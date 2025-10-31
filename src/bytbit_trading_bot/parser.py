@@ -153,7 +153,15 @@ async def start_telethon():
         
         # Шаг 1: Подключаемся к Telegram через ваш аккаунт (НЕ через бота!)
         # Сначала пытаемся подключиться без интерактивного ввода
-        await client.connect()
+        try:
+            await client.connect()
+        except Exception as e:
+            logger.error(f"[Telethon] Ошибка подключения: {e}")
+            if not session_exists:
+                logger.error(f"[Telethon] ❌ Файл сессии {session_file} не найден!")
+                logger.error(f"[Telethon] ❌ Запустите: python3 scripts/init_telethon_session.py")
+                return
+            raise
         
         # Проверяем, авторизован ли пользователь
         if not await client.is_user_authorized():
