@@ -56,43 +56,62 @@ python main.py
 
 ### Ручное развертывание
 
+#### Способ 1: Использование скрипта деплоя
+
+```bash
+# На вашем локальном компьютере
+./scripts/deploy_manual.sh
+
+# Или с указанием параметров сервера
+SERVER_USER=root SERVER_HOST=91.229.8.171 SERVER_PATH=/root/trade_bot ./scripts/deploy_manual.sh
+```
+
+#### Способ 2: Ручное обновление на сервере
+
 ```bash
 # 1. Подключитесь к серверу
 ssh root@your-server-ip
 
-# 2. Установите зависимости системы
-apt-get update
-apt-get install -y python3 python3-pip python3-venv git
+# 2. Перейдите в директорию проекта
+cd /root/trade_bot
 
-# 3. Клонируйте проект
-cd /root
-git clone https://github.com/your-username/trade_bot.git
-cd trade_bot
+# 3. Обновите код из GitHub
+git pull origin master
 
-# 4. Создайте виртуальное окружение
-python3 -m venv .venv
+# 4. Обновите зависимости
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.txt --upgrade
 
-# 5. Создайте директории для данных
-mkdir -p src/bytbit_trading_bot/data
-echo "{}" > src/bytbit_trading_bot/data/users.json
-echo "{}" > src/bytbit_trading_bot/data/tokens.json
+# 5. Перезапустите бота
+systemctl restart bytbit-bot.service
 
-# 6. Создайте Telethon сессию
-python3 scripts/init_telethon_session.py
-
-# 7. Настройте systemd service
-cp scripts/bytbit-bot.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable bytbit-bot.service
-systemctl start bytbit-bot.service
-
-# 8. Проверьте статус
+# 6. Проверьте статус
 systemctl status bytbit-bot.service
 journalctl -u bytbit-bot.service -f
 ```
+
+#### Проверка статуса деплоя
+
+Если автоматический деплой не сработал:
+
+1. **Проверьте GitHub Actions:**
+   - Откройте https://github.com/makhotin07/trade_bot/actions
+   - Посмотрите последний workflow run
+   - Если есть ошибки, проверьте логи
+
+2. **Проверьте секреты GitHub:**
+   - Settings → Secrets and variables → Actions
+   - Убедитесь, что есть: `SSH_PRIVATE_KEY`, `SERVER_HOST`, `SERVER_USER`, `SERVER_PATH`
+
+3. **Проверьте SSH подключение:**
+   ```bash
+   ssh -i ~/.ssh/id_rsa root@91.229.8.171
+   ```
+
+4. **Проверьте статус бота на сервере:**
+   ```bash
+   ssh root@91.229.8.171 "cd /root/trade_bot && git log --oneline -1"
+   ```
 
 ## Команды бота
 
