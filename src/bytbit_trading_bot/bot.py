@@ -2,6 +2,7 @@
 Telegram бот для управления
 """
 import logging
+import os
 import telebot
 from .utils import save_user_config, get_user_config, is_user_enabled, load_json, TOKENS_FILE
 from .config import TOKEN
@@ -182,10 +183,16 @@ def process_leverage(message):
 def list_tokens(message):
     """Показывает список запланированных токенов"""
     try:
+        # Логируем путь к файлу для отладки
+        logger.info(f"[Bot] Команда /list: ищем файл {TOKENS_FILE}")
+        logger.info(f"[Bot] Файл существует: {os.path.exists(TOKENS_FILE)}")
+        
         tokens = load_json(TOKENS_FILE)
+        logger.info(f"[Bot] Загружено токенов из файла: {len(tokens)}")
         
         if not tokens:
             bot.reply_to(message, "📋 Нет запланированных токенов")
+            logger.warning(f"[Bot] Файл {TOKENS_FILE} пуст или не найден")
             return
         
         # Получаем задачи из планировщика

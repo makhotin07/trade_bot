@@ -74,7 +74,16 @@ async def process_message(message_text):
         "result_datetime": result_date.isoformat(),
         "added_at": datetime.now().isoformat()
     }
+    
+    logger.info(f"[Telethon] Сохранение токена в файл {TOKENS_FILE}")
     save_json(TOKENS_FILE, tokens)
+    
+    # Проверяем, что токен действительно сохранился
+    tokens_after = load_json(TOKENS_FILE)
+    if token_key in tokens_after:
+        logger.info(f"[Telethon] ✅ Токен {token_key} успешно сохранен в файл")
+    else:
+        logger.error(f"[Telethon] ❌ Ошибка: токен {token_key} не найден в файле после сохранения!")
     
     # Ставим задачу в календарь (планировщик)
     schedule_token(token, result_date)

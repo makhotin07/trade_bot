@@ -11,8 +11,10 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 # Базовая директория проекта
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# Определяем корень проекта: поднимаемся на 2 уровня вверх от utils.py (src/bytbit_trading_bot/utils.py -> src/ -> корень проекта)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # src/bytbit_trading_bot
+PROJECT_ROOT = os.path.dirname(os.path.dirname(BASE_DIR))  # корень проекта
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 TOKENS_FILE = os.path.join(DATA_DIR, "tokens.json")
 
