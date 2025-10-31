@@ -127,6 +127,7 @@ async def start_telethon():
     4. Если время Result в будущем — ставит задачу в календарь
     5. Слушает новые сообщения в реальном времени
     """
+    import os
     global client
     
     if not API_ID or not API_HASH:
@@ -146,10 +147,51 @@ async def start_telethon():
             logger.error(f"[Telethon] Ошибка обработки сообщения: {e}", exc_info=True)
     
     try:
+        # Проверяем существование файла сессии
+        session_file = f"{SESSION_NAME}.session"
+        session_exists = os.path.exists(session_file)
+        
         # Шаг 1: Подключаемся к Telegram через ваш аккаунт (НЕ через бота!)
-        # Важно: client.start() должен запросить номер телефона, а не токен бота
-        # Если вы видите запрос "Please enter your phone (or bot token):" - введите номер телефона
-        await client.start()
+        # Сначала пытаемся подключиться без интерактивного ввода
+        await client.connect()
+        
+        # Проверяем, авторизован ли пользователь
+        if not await client.is_user_authorized():
+            if not session_exists:
+                logger.warning(f"[Telethon] ⚠️  Файл сессии {session_file} не найден!")
+                logger.warning(f"[Telethon] ⚠️  Необходимо создать сессию вручную один раз.")
+                logger.warning(f"[Telethon] ⚠️  Выполните на сервере:")
+                logger.warning(f"[Telethon] ⚠️  ssh root@91.229.8.171")
+                logger.warning(f"[Telethon] ⚠️  cd /root/trade_bot")
+                logger.warning(f"[Telethon] ⚠️  source .venv/bin/activate")
+                logger.warning(f"[Telethon] ⚠️  python3 -c \"import sys; sys.path.insert(0, 'src'); from bytbit_trading_bot.parser import start_telethon; import asyncio; asyncio.run(start_telethon())\"")
+                logger.warning(f"[Telethon] ⚠️  Введите номер телефона и код подтверждения")
+                logger.warning(f"[Telethon] ⚠️  После успешной авторизации сессия будет сохранена")
+                logger.error(f"[Telethon] ❌ Бот не может запуститься без сессии. Создайте сессию вручную.")
+                return
+            
+            # Сессия существует, но не авторизована - пробуем через переменные окружения
+            phone = os.getenv("TELEGRAM_PHONE")
+            password = os.getenv("TELEGRAM_PASSWORD")
+            
+            if phone:
+                logger.info(f"[Telethon] Попытка авторизации через номер телефона из переменных окружения")
+                try:
+                    await client.send_code_request(phone)
+                    code = os.getenv("TELEGRAM_CODE")
+                    if code:
+                        await client.sign_in(phone, code, password=password)
+                    else:
+                        logger.error(f"[Telethon] Требуется TELEGRAM_CODE для авторизации")
+                        return
+                except Exception as e:
+                    logger.error(f"[Telethon] Ошибка авторизации через переменные окружения: {e}")
+                    logger.error(f"[Telethon] Создайте сессию вручную (см. инструкцию выше)")
+                    return
+            else:
+                logger.error(f"[Telethon] ❌ Сессия не авторизована и нет TELEGRAM_PHONE в переменных окружения")
+                logger.error(f"[Telethon] ❌ Создайте сессию вручную или установите TELEGRAM_PHONE и TELEGRAM_CODE")
+                return
         
         # Проверяем, что авторизация прошла как пользователь, а не как бот
         me = await client.get_me()
@@ -168,6 +210,10 @@ async def start_telethon():
         # Шаг 5: Продолжаем слушать новые сообщения в реальном времени
         logger.info("[Telethon] Начинаю слушать новые сообщения из канала...")
         await client.run_until_disconnected()
+    except EOFError:
+        logger.error("[Telethon] ❌ Ошибка: требуется интерактивный ввод для авторизации")
+        logger.error("[Telethon] ❌ Создайте сессию вручную один раз (см. инструкцию выше)")
+        logger.error("[Telethon] ❌ Или используйте переменные окружения TELEGRAM_PHONE и TELEGRAM_CODE")
     except Exception as e:
         logger.error(f"[Telethon] Ошибка запуска: {e}", exc_info=True)
         raise
