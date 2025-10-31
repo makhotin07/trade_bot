@@ -98,7 +98,9 @@ jobs:
           cd ${{ secrets.SERVER_PATH }} || exit 1
           
           echo "🔄 Обновление кода из GitHub..."
-          git pull origin main || git pull origin master
+          # Используем HTTPS для git pull (GitHub Actions имеет доступ)
+          git remote set-url origin https://github.com/makhotin07/trade_bot.git || true
+          git pull origin master || git pull origin main || echo "⚠️  Git pull не удался, но проект уже на сервере"
           
           echo "📦 Обновление зависимостей..."
           if [ -d ".venv" ]; then
