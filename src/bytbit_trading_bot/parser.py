@@ -231,19 +231,29 @@ async def start_telethon():
             raise
         
         # Проверяем, авторизован ли пользователь
-        if not await client.is_user_authorized():
+        is_authorized = await client.is_user_authorized()
+        logger.info(f"[Telethon] Проверка авторизации: is_authorized={is_authorized}, session_file={session_file}, session_exists={session_exists}")
+        
+        if not is_authorized:
+            logger.warning(f"[Telethon] ⚠️  Сессия существует, но не авторизована!")
+            logger.warning(f"[Telethon] ⚠️  Файл сессии: {session_file}")
+            logger.warning(f"[Telethon] ⚠️  Файл существует: {os.path.exists(session_file)}")
+            logger.warning(f"[Telethon] ⚠️  Возможно, сессия была удалена или повреждена при обновлении.")
+            logger.warning(f"[Telethon] ⚠️  Необходимо пересоздать сессию.")
+            logger.warning(f"[Telethon] ⚠️  Выполните на сервере:")
+            logger.warning(f"[Telethon] ⚠️  1. cd /root/trade_bot")
+            logger.warning(f"[Telethon] ⚠️  2. source .venv/bin/activate")
+            logger.warning(f"[Telethon] ⚠️  3. python3 scripts/init_telethon_session.py")
+            logger.warning(f"[Telethon] ⚠️  4. Введите номер телефона и код подтверждения из Telegram")
+            logger.warning(f"[Telethon] ⚠️  5. После успешной авторизации перезапустите бота:")
+            logger.warning(f"[Telethon] ⚠️     systemctl restart bytbit-bot.service")
+            
             if not session_exists:
-                logger.warning(f"[Telethon] ⚠️  Файл сессии {session_file} не найден!")
-                logger.warning(f"[Telethon] ⚠️  Необходимо создать сессию вручную один раз.")
-                logger.warning(f"[Telethon] ⚠️  Выполните на сервере:")
-                logger.warning(f"[Telethon] ⚠️  ssh root@91.229.8.171")
-                logger.warning(f"[Telethon] ⚠️  cd /root/trade_bot")
-                logger.warning(f"[Telethon] ⚠️  source .venv/bin/activate")
-                logger.warning(f"[Telethon] ⚠️  python3 -c \"import sys; sys.path.insert(0, 'src'); from bytbit_trading_bot.parser import start_telethon; import asyncio; asyncio.run(start_telethon())\"")
-                logger.warning(f"[Telethon] ⚠️  Введите номер телефона и код подтверждения")
-                logger.warning(f"[Telethon] ⚠️  После успешной авторизации сессия будет сохранена")
-                logger.error(f"[Telethon] ❌ Бот не может запуститься без сессии. Создайте сессию вручную.")
+                logger.error(f"[Telethon] ❌ Файл сессии {session_file} не найден!")
+                logger.error(f"[Telethon] ❌ Запустите: python3 scripts/init_telethon_session.py")
                 return
+            
+            logger.error(f"[Telethon] ❌ Бот не может запуститься без авторизованной сессии. Создайте сессию вручную.")
             
             # Сессия существует, но не авторизована - пробуем через переменные окружения
             phone = os.getenv("TELEGRAM_PHONE")
