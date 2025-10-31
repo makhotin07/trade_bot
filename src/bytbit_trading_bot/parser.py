@@ -44,7 +44,11 @@ async def process_message(message_text):
         if "Result" in message_text or "result" in message_text.lower():
             logger.warning(f"[Telethon] ⚠️  В сообщении есть 'Result', но оно не совпало с паттерном!")
             logger.warning(f"[Telethon] ⚠️  Паттерн: {POST_REGEX}")
-            logger.warning(f"[Telethon] ⚠️  Сообщение: {message_text[:300]}")
+            logger.warning(f"[Telethon] ⚠️  Сообщение: {message_text[:500]}")
+            # Пытаемся найти токен вручную
+            lines = message_text.split('\n')
+            if len(lines) > 0:
+                logger.warning(f"[Telethon] ⚠️  Первая строка сообщения: {lines[0]}")
         return False
     
     # Извлекаем токен и дату Result
