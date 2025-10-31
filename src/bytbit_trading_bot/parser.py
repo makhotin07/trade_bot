@@ -266,6 +266,7 @@ async def start_telethon():
                     code = os.getenv("TELEGRAM_CODE")
                     if code:
                         await client.sign_in(phone, code, password=password)
+                        logger.info(f"[Telethon] ✅ Авторизация через переменные окружения успешна")
                     else:
                         logger.error(f"[Telethon] Требуется TELEGRAM_CODE для авторизации")
                         return
