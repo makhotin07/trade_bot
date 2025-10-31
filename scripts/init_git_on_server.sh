@@ -14,12 +14,14 @@ SERVER_PATH="${SERVER_PATH:-/root/trade_bot}"
 echo "📡 Подключение к серверу: ${SERVER_USER}@${SERVER_HOST}"
 echo "📁 Путь на сервере: ${SERVER_PATH}"
 
-ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} << EOF
+ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} << 'REMOTE_EOF'
     set -e
     
+    SERVER_PATH="/root/trade_bot"
+    
     echo "🔄 Переход в директорию проекта..."
-    cd ${SERVER_PATH} || {
-        echo "❌ Ошибка: директория ${SERVER_PATH} не найдена"
+    cd "$SERVER_PATH" || {
+        echo "❌ Ошибка: директория $SERVER_PATH не найдена"
         exit 1
     }
     
@@ -28,6 +30,15 @@ ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} << EOF
         echo "⚠️  Git репозиторий уже существует"
         echo "📋 Текущий remote:"
         git remote -v || echo "Remote не настроен"
+        
+        # Проверяем remote origin
+        if ! git remote get-url origin > /dev/null 2>&1; then
+            echo "📡 Добавление remote origin..."
+            git remote add origin https://github.com/makhotin07/trade_bot.git
+        else
+            echo "✅ Remote origin уже настроен"
+            git remote set-url origin https://github.com/makhotin07/trade_bot.git
+        fi
     else
         echo "🔄 Инициализация git репозитория..."
         git init
@@ -84,7 +95,7 @@ ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} << EOF
     
     echo ""
     echo "✅ Инициализация завершена успешно"
-EOF
+REMOTE_EOF
 
 echo ""
 echo "✅ Инициализация git на сервере завершена"

@@ -93,23 +93,60 @@ jobs:
     
     - name: Deploy to server
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'DEPLOY_EOF'
           set -e
-          cd ${{ secrets.SERVER_PATH }} || exit 1
+          cd ${{ secrets.SERVER_PATH }} || {
+            echo "❌ Директория не найдена, создаем..."
+            mkdir -p ${{ secrets.SERVER_PATH }}
+            cd ${{ secrets.SERVER_PATH }}
+          }
+          
+          echo "📋 Проверка git репозитория..."
+          if [ ! -d ".git" ]; then
+            echo "🔄 Инициализация git репозитория..."
+            git init
+            git branch -M master
+            git remote add origin https://github.com/makhotin07/trade_bot.git || git remote set-url origin https://github.com/makhotin07/trade_bot.git
+          else
+            echo "✅ Git репозиторий уже существует"
+            git remote set-url origin https://github.com/makhotin07/trade_bot.git || git remote add origin https://github.com/makhotin07/trade_bot.git || true
+          fi
           
           echo "🔄 Обновление кода из GitHub..."
-          # Используем HTTPS для git pull (GitHub Actions имеет доступ)
-          git remote set-url origin https://github.com/makhotin07/trade_bot.git || true
-          git pull origin master || git pull origin main || echo "⚠️  Git pull не удался, но проект уже на сервере"
+          git fetch origin master || {
+            echo "⚠️  Fetch не удался, пробуем pull..."
+            git pull origin master || {
+              echo "⚠️  Pull не удался, пробуем reset..."
+              git reset --hard origin/master || {
+                echo "⚠️  Reset не удался, возможно репозиторий пустой. Клонируем заново..."
+                cd ..
+                rm -rf trade_bot
+                git clone https://github.com/makhotin07/trade_bot.git
+                cd trade_bot
+              }
+            }
+          }
+          
+          # Если fetch успешен, делаем pull
+          git pull origin master || git reset --hard origin/master || true
+          
+          echo "✅ Код обновлен. Текущий коммит:"
+          git log --oneline -1 || echo "⚠️  Не удалось получить коммит"
           
           echo "📦 Обновление зависимостей..."
           if [ -d ".venv" ]; then
             source .venv/bin/activate
           elif [ -d "venv" ]; then
             source venv/bin/activate
+          else
+            echo "⚠️  Виртуальное окружение не найдено, создаем..."
+            python3 -m venv .venv
+            source .venv/bin/activate
           fi
           
-          pip install -r requirements.txt --upgrade --quiet
+          pip install -r requirements.txt --upgrade --quiet || {
+            echo "⚠️  Ошибка установки зависимостей"
+          }
           
           echo "🔄 Перезапуск бота..."
           if systemctl is-active --quiet bytbit-bot.service 2>/dev/null; then
@@ -123,4 +160,4 @@ jobs:
           fi
           
           echo "✅ Деплой завершен успешно"
-        EOF
+        DEPLOY_EOF
